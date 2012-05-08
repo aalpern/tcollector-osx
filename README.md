@@ -28,4 +28,5 @@ on older releases.
 ## Other Stats
 
 Apple seems to enjoy making the output of their stats utilities human
-readable, but harder to machine parse. ```netstat -m```, ```netstat -mm```, and ```netstat -s```
+readable, but harder to machine parse. ```netstat -m```, ```netstat
+-mm```, and ```netstat -s```, for example.
