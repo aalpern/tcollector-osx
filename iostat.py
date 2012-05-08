@@ -6,58 +6,51 @@ import subprocess
 import sys
 import time
 
-COLLECTION_INTERVAL = 10  # seconds
+# seconds. The actual interval will be 1 second longer, because iostat
+# has a minimum one-second delay to get the current values, rather
+# than the values averaged over system uptime.
+COLLECTION_INTERVAL = 9  
 
-#adamalpern@Bliterator: 6:22PM ? iostat  
-#          disk0       cpu     load average
-#    KB/t tps  MB/s  us sy id   1m   5m   15m
-#   30.32  13  0.38   3  1 96  1.67 1.68 1.55
+#adamalpern@Bliterator: 8:18PM ? iostat -c 2 -w 1 
+#          disk0           disk1       cpu     load average
+#    KB/t tps  MB/s     KB/t tps  MB/s  us sy id   1m   5m   15m
+#   28.51  11  0.31    34.61   0  0.00   2  2 96  1.78 1.86 1.54
+#    0.00   0  0.00     0.00   0  0.00   3  2 94  1.78 1.86 1.54
 
 def main():
     while True:
         ts = int(time.time())
 
-        proc = subprocess.Popen(["iostat"], stdout=subprocess.PIPE)
+        proc = subprocess.Popen(["iostat", "-c 2 -w 1"], stdout=subprocess.PIPE)
         stdout, _ = proc.communicate()
 
-        cpu_user_index = -1
-        cpu_sys_index  = -1
-        cpu_idle_index = -1
-        load_1m_index  = -1
-        load_5m_index  = -1
-        load_15m_index = -1
-
         if proc.returncode == 0:
-            lines = stdout.split("\n")
-            headers = lines[1].split()
-            for i in range(0, len(headers)):
-                h = headers[i]
-                if h == "us":
-                    cpu_user_index = i
-                elif h == "sy":
-                    cpu_sys_index = i
-                elif h == "id":
-                    cpu_idle_index = i
-                elif h == "1m":
-                    load_1m_index = i
-                elif h == "5m":
-                    load_5m_index = i
-                elif h == "15m":
-                    load_15m_index = i
-
-            for line in lines:
-                if not line:
-                    continue
-                fields = line.split()
-                if not fields[1].isdigit():
-                    continue
-                print ("cpu.usage.user %d %s" % (ts, fields[cpu_user_index])) 
-                print ("cpu.usage.system %d %s" % (ts, fields[cpu_sys_index]))
-                print ("cpu.usage.idle %d %s" % (ts, fields[cpu_idle_index]))                       
-                print ("load.average.1m %d %s" % (ts, fields[load_1m_index]))
-                print ("load.average.5m %d %s" % (ts, fields[load_5m_index])) 
-                print ("load.average.15m %d %s" % (ts, fields[load_15m_index]))
-
+            lines      = stdout.split("\n")
+            categories = lines[0].split()
+            values     = lines[3].split()
+            i          = 0
+            for cat in categories:
+                if cat.startswith('disk'):
+                    print ("iostat.disk.KBt %d %s disk=%s" % (ts, values[i], cat))
+                    i += 1
+                    print ("iostat.disk.tps %d %s disk=%s" % (ts, values[i], cat))
+                    i += 1
+                    print ("iostat.disk.MBs %d %s disk=%s" % (ts, values[i], cat))
+                    i += 1
+                elif cat == "cpu":
+                    print ("iostat.cpu.user %d %s" % (ts, values[i]))
+                    i += 1
+                    print ("iostat.cpu.sys %d %s" % (ts, values[i]))
+                    i += 1
+                    print ("iostat.cpu.idle %d %s" % (ts, values[i]))
+                    i += 1
+                elif cat == "load":
+                    print ("iostat.loadaverage.1m %d %s" % (ts, values[i]))
+                    i += 1
+                    print ("iostat.loadaverage.5m %d %s" % (ts, values[i]))
+                    i += 1
+                    print ("iostat.loadaverage.15m %d %s" % (ts, values[i]))
+                    i += 1
         else:
             print >> sys.stderr, "vm_stat returned %r" % proc.returncode
 
